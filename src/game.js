@@ -6396,10 +6396,9 @@ export class Game {
       } else this.endKeydown();
     }
 
-    // Touch movement picks up drops underfoot while walking; the pickup key still works on ladders and ropes.
-    const touchHeld = inp.sources.get('touch');
-    const touchWalking = !sd && p.fh && !p.ladder && dir !== 0 && (touchHeld?.has('left') || touchHeld?.has('right'));
-    if (this.net && !p.seat && (this.pickupKey() || touchWalking)) this.tryPickup();
+    // Walking auto-pickup is shared by touch, keyboard and controller; the pickup key still works on ladders and ropes.
+    const autoPickupWalking = this.controls.touch.autoPickup !== false && !sd && p.fh && !p.ladder && dir !== 0;
+    if (this.net && !p.seat && (this.pickupKey() || autoPickupWalking)) this.tryPickup();
     if (p.ladder) {
       const l = p.ladder;
       // a buff cast here plays ladder2 / rope2, and you hang still until it's over

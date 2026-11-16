@@ -162,6 +162,7 @@ const preview = () => ({ x: 330, y: 30, w: 268, h: Math.min(201, Math.round((268
 const SHOW = [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']];
 const SIZES = [[0.8, 'Small'], [1, 'Medium'], [1.25, 'Large'], [1.5, 'X-Large'], [1.8, 'Huge']];
 const OPACITY = [[0.5, '50%'], [0.75, '75%'], [1, '100%']];
+const TOGGLE = [[true, 'On'], [false, 'Off']];
 const BUTTON = 58, STICK = 120;
 const TOUCH_GRID = 0.05;
 const TOUCH_STICK_ANCHORS = [0.75, 0.85].flatMap((x) => [0.2, 0.4, 0.6, 0.8].map((y) => [x, y]));
@@ -192,7 +193,7 @@ function touchAnchor(x, y, anchors) {
 
 export class ControlTabs {
   /** win: the Key Setting window (its draft controls, icons, carry and binding conversion). */
-  constructor(win) { this.win = win; this.picked = null; this.dragging = null; this.anchorTarget = 'button'; }
+  constructor(win) { this.win = win; this.picked = null; this.dragging = null; }
 
   get g() { return this.win.g; }
   get mgr() { return this.win.mgr; }
@@ -327,17 +328,18 @@ export class ControlTabs {
       ['Show touch controls', SHOW, t.show, (v) => { t.show = v; }],
       ['Button size', SIZES, t.size, (v) => { t.size = v; }],
       ['Opacity', OPACITY, t.opacity, (v) => { t.opacity = v; }],
+      ['Auto pick up when walking (all controls)', TOGGLE, t.autoPickup !== false, (v) => { t.autoPickup = v; }],
     ];
   }
   /** A row's choices share the width left of the preview: 3 across, or 5 narrower ones. */
-  optionRect(r, o) { const w = this.rows()[r][1].length > 3 ? 56 : 86; return { x: 18 + o * (w + 6), y: 46 + r * 48, w, h: 22 }; }
+  optionRect(r, o) { const w = this.rows()[r][1].length > 3 ? 56 : 86; return { x: 18 + o * (w + 6), y: 42 + r * 39, w, h: 22 }; }
   addRect() { return { x: 18, y: 192, w: 132, h: 22 }; }
   removeRect() { return { x: 156, y: 192, w: 132, h: 22 }; }
 
   drawTouch(ctx) {
     const m = this.mgr, t = this.draft.touch;
     this.rows().forEach(([label, opts, cur], r) => {
-      uiText(ctx, label, 18, 30 + r * 48, { color: '#334455', size: 11, bold: true });
+      uiText(ctx, label, 18, 27 + r * 39, { color: '#334455', size: 11, bold: true });
       opts.forEach(([v, text], o) => {
         const q = this.optionRect(r, o), on = v === cur;
         cap(ctx, q.x, q.y, q.w, q.h, { pink: on });
@@ -356,8 +358,6 @@ export class ControlTabs {
     ctx.fillStyle = '#556677'; ctx.fillRect(P.x, P.y, P.w, P.h);
     ctx.fillStyle = '#445566'; ctx.fillRect(P.x, P.y + P.h * (1 - 71 / UI_H), P.w, P.h * 71 / UI_H);   // where the status bar sits
     const k = P.w / UI_W * (t.size || 1);
-    const anchors = this.anchorTarget === 'stick' ? TOUCH_STICK_ANCHORS : touchButtonAnchors(t.size || 1);
-    for (const [x, y] of anchors) this.circle(ctx, P.x + x * P.w, P.y + y * P.h, 3, 0.8, '#ffcc33');
     this.circle(ctx, P.x + t.stick.x * P.w, P.y + t.stick.y * P.h, STICK * k / 2, t.opacity);
     this.circle(ctx, P.x + t.stick.x * P.w, P.y + t.stick.y * P.h, 25 * k, t.opacity, '#ffffff');
     for (const b of t.buttons) {
@@ -373,7 +373,10 @@ export class ControlTabs {
       }
       if (this.picked === b.id) { ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, r + 2, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
     }
-    uiText(ctx, 'Drag near a gold point to lock, or elsewhere for the 5% grid; drop bindings on buttons.', 18, 222, { color: '#556677', size: 11 });
+    const anchors = this.dragAnchors || { stick: TOUCH_STICK_ANCHORS, buttons: touchButtonAnchors(t.size || 1) };
+    for (const [x, y] of anchors.stick) this.circle(ctx, P.x + x * P.w, P.y + y * P.h, 5, 0.8, '#ffcc33');
+    for (const [x, y] of anchors.buttons) this.circle(ctx, P.x + x * P.w, P.y + y * P.h, 3, 0.8, '#ffcc33');
+    uiText(ctx, 'Gold: snap points. Auto pickup applies to all controls.', 18, 222, { color: '#556677', size: 11 });
   }
   circle(ctx, x, y, r, alpha, fill = 'rgba(0,0,64,0.627)') {
     ctx.save(); ctx.globalAlpha = alpha ?? 0.8;
@@ -426,7 +429,12 @@ export class ControlTabs {
       return true;
     }
     const at = this.touchAt(lx, ly, this.mgr.touch ? TOUCH_GRAB : 2);
-    if (at !== null) { if (at !== 'stick') this.picked = at; this.dragging = at; this.anchorTarget = at === 'stick' ? 'stick' : 'button'; this.dragMoved = false; return true; }
+    if (at !== null) {
+      if (at !== 'stick') this.picked = at;
+      this.dragging = at; this.dragMoved = false;
+      this.dragAnchors = { stick: TOUCH_STICK_ANCHORS, buttons: touchButtonAnchors(t.size || 1) };
+      return true;
+    }
     return false;
   }
   move(lx, ly) {
@@ -435,7 +443,7 @@ export class ControlTabs {
     const fx = Math.min(0.97, Math.max(0.03, (lx - P.x) / P.w)), fy = Math.min(0.97, Math.max(0.03, (ly - P.y) / P.h));
     const target = this.dragging === 'stick' ? t.stick : t.buttons.find((b) => b.id === this.dragging);
     if (target) {
-      const anchors = this.dragging === 'stick' ? TOUCH_STICK_ANCHORS : touchButtonAnchors(t.size || 1);
+      const anchors = this.dragging === 'stick' ? this.dragAnchors.stick : this.dragAnchors.buttons;
       const anchor = touchAnchor(fx, fy, anchors);
       const x = anchor ? anchor[0] : fx, y = anchor ? anchor[1] : fy;
       if (target.x !== x || target.y !== y) this.dragMoved = true;
@@ -451,7 +459,7 @@ export class ControlTabs {
         target.y = snapTouchPosition(target.y, size, UI_H, diameter);
       }
     }
-    this.dragging = null; this.dragMoved = false;
+    this.dragging = null; this.dragMoved = false; this.dragAnchors = null;
   }
 
   /** A skill, item or function dropped on this tab. Returns true when it landed on a slot. */

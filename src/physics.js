@@ -228,8 +228,9 @@ export class Footholds {
     if (!swimming) ent.vy = Math.min(ent.vy + PHYS.gravity * dt, PHYS.maxFall);
     let x0 = ent.x, y0 = ent.y, nx = ent.x + ((vx0 + ent.vx) / 2) * dt, ny = ent.y + ((vy0 + ent.vy) / 2) * dt;
     // the map's sides are walls for what is inside them
-    if (x0 >= this.wallL && nx < this.wallL) { nx = this.wallL; ent.vx = 0; }
-    else if (x0 <= this.wallR && nx > this.wallR) { nx = this.wallR; ent.vx = 0; }
+    // A floor can extend past a map wall; stop outward jumps that start past the wall without blocking inward motion.
+    if (nx < this.wallL && !(x0 < this.wallL && nx > x0)) { nx = this.wallL; ent.vx = 0; }
+    else if (nx > this.wallR && !(x0 > this.wallR && nx < x0)) { nx = this.wallR; ent.vx = 0; }
     // a floor is landed on where the path meets it. A wall or an underside stops the path there and leaves only the
     // speed along it; the rest of the step then goes on along it (down a wall's face, across under an underside),
     // where it may meet something else: the floor at the wall's foot, the wall at the underside's end.

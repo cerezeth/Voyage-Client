@@ -36,7 +36,7 @@ export function defaultPad() {
 /** Touch layout: positions are fractions of the 800x600 view (the button's centre). Shown by default on touch devices. */
 export function defaultTouch() {
   return {
-    show: 'auto', size: 1, opacity: 0.75,
+    show: 'auto', size: 1, opacity: 0.75, autoPickup: true,
     stick: { x: 0.12, y: 0.74 },
     buttons: [
       // above the quick slots in the bottom-right corner
@@ -66,7 +66,7 @@ export function loadControls() {
     const c = JSON.parse(readKept(STORE) || 'null');
     if (c) {
       const touch = { ...defaultTouch(), ...c.touch };
-      touch.buttons = touch.buttons.filter((b) => !(b.b?.type === 5 && b.b.action === ACTION.PICKUP));
+      touch.buttons = touch.buttons.filter((b) => !(b.b?.type === 5 && [ACTION.PICKUP, ACTION.NPC_CHAT].includes(b.b.action)));
       return { pad: c.pad || defaultPad(), padMove: c.padMove === 'dpad' ? 'dpad' : 'ls', touch };
     }
   } catch { /* storage blocked or bad data: the defaults */ }

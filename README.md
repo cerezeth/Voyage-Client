@@ -62,7 +62,7 @@ Voyage-Client/  Voyage-Server/  Voyage-Editor/    # each pointed at ../voyage-as
 | 🪟 | **Windows** | Inventory, stats, trade, Maker, Dojo, Pyramid, Transform, Cash Shop, Player Shop (MTS), guild (alliance invitations), party, messenger and world map |
 | 💬 | **Social** | Give and take fame from other players |
 | 🌊 | **Aran** | Energy charge and combo count |
-| 📱 | **Touch & gamepad** | Arrange touch controls on a snap grid, auto-pick up drops while walking, and use gamepad support |
+| 📱 | **Touch & gamepad** | Arrange touch controls on a snap grid; toggle walking auto-pickup for touch, keyboard and gamepad; gamepad support included |
 | 🎛️ | **Settings** | Server and quality-of-life options in `conf/client.conf` (see [Settings](#%EF%B8%8F-settings)) |
 
 ## 🧩 How It Works in a Browser
@@ -277,7 +277,7 @@ Yes, with Voyage Client. It renders maps, characters, monsters, and the v83 UI i
 
 <br />
 
-Yes. Touch controls appear automatically on touch devices and can be arranged on a snap grid; drops are picked up while walking. Gamepad support is included too.
+Yes. Touch controls appear automatically on touch devices and can be arranged on a snap grid. The Touch tab's **Auto pick up when walking** setting applies to touch, keyboard and gamepad input. Gamepad support is included too.
 
 </details>
 
