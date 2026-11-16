@@ -163,12 +163,31 @@ const SHOW = [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']];
 const SIZES = [[0.8, 'Small'], [1, 'Medium'], [1.25, 'Large'], [1.5, 'X-Large'], [1.8, 'Huge']];
 const OPACITY = [[0.5, '50%'], [0.75, '75%'], [1, '100%']];
 const BUTTON = 58, STICK = 120;
+const TOUCH_GRID = 0.05;
+const TOUCH_BUTTON_ANCHORS = [0.8, 0.9].flatMap((x) => [0.2, 0.4, 0.6, 0.8].map((y) => [x, y]));
+const TOUCH_STICK_ANCHORS = [0.75, 0.85].flatMap((x) => [0.2, 0.4, 0.6, 0.8].map((y) => [x, y]));
+const TOUCH_ANCHOR_RADIUS = 48;
 /** How far past its edge (interface px) a finger still takes a control in the preview: they are small there. */
 const TOUCH_GRAB = 16;
 
+function snapTouchPosition(value, size, extent, diameter) {
+  const margin = diameter * size / (2 * extent), min = Math.ceil(margin / TOUCH_GRID - 1e-9) * TOUCH_GRID;
+  const max = Math.floor((1 - margin) / TOUCH_GRID + 1e-9) * TOUCH_GRID;
+  return Math.max(min, Math.min(max, Math.round(value / TOUCH_GRID) * TOUCH_GRID));
+}
+
+function touchAnchor(x, y, anchors) {
+  let closest = null, distance = TOUCH_ANCHOR_RADIUS;
+  for (const point of anchors) {
+    const d = Math.hypot((x - point[0]) * UI_W, (y - point[1]) * UI_H);
+    if (d <= distance) { closest = point; distance = d; }
+  }
+  return closest;
+}
+
 export class ControlTabs {
   /** win: the Key Setting window (its draft controls, icons, carry and binding conversion). */
-  constructor(win) { this.win = win; this.picked = null; this.dragging = null; }
+  constructor(win) { this.win = win; this.picked = null; this.dragging = null; this.anchorTarget = 'button'; }
 
   get g() { return this.win.g; }
   get mgr() { return this.win.mgr; }
@@ -332,6 +351,8 @@ export class ControlTabs {
     ctx.fillStyle = '#556677'; ctx.fillRect(P.x, P.y, P.w, P.h);
     ctx.fillStyle = '#445566'; ctx.fillRect(P.x, P.y + P.h * (1 - 71 / UI_H), P.w, P.h * 71 / UI_H);   // where the status bar sits
     const k = P.w / UI_W * (t.size || 1);
+    const anchors = this.anchorTarget === 'stick' ? TOUCH_STICK_ANCHORS : TOUCH_BUTTON_ANCHORS;
+    for (const [x, y] of anchors) this.circle(ctx, P.x + x * P.w, P.y + y * P.h, 3, 0.8, '#ffcc33');
     this.circle(ctx, P.x + t.stick.x * P.w, P.y + t.stick.y * P.h, STICK * k / 2, t.opacity);
     this.circle(ctx, P.x + t.stick.x * P.w, P.y + t.stick.y * P.h, 25 * k, t.opacity, '#ffffff');
     for (const b of t.buttons) {
@@ -347,7 +368,7 @@ export class ControlTabs {
       }
       if (this.picked === b.id) { ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, r + 2, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
     }
-    uiText(ctx, 'Drag to move. Drop skills, items or functions on a button.', 18, 222, { color: '#556677', size: 11 });
+    uiText(ctx, 'Drag near a gold point to lock, or elsewhere for the 5% grid; drop bindings on buttons.', 18, 222, { color: '#556677', size: 11 });
   }
   circle(ctx, x, y, r, alpha, fill = 'rgba(0,0,64,0.627)') {
     ctx.save(); ctx.globalAlpha = alpha ?? 0.8;
@@ -400,7 +421,7 @@ export class ControlTabs {
       return true;
     }
     const at = this.touchAt(lx, ly, this.mgr.touch ? TOUCH_GRAB : 2);
-    if (at !== null) { if (at !== 'stick') this.picked = at; this.dragging = at; return true; }
+    if (at !== null) { if (at !== 'stick') this.picked = at; this.dragging = at; this.anchorTarget = at === 'stick' ? 'stick' : 'button'; this.dragMoved = false; return true; }
     return false;
   }
   move(lx, ly) {
@@ -408,9 +429,25 @@ export class ControlTabs {
     const t = this.draft.touch, P = preview();
     const fx = Math.min(0.97, Math.max(0.03, (lx - P.x) / P.w)), fy = Math.min(0.97, Math.max(0.03, (ly - P.y) / P.h));
     const target = this.dragging === 'stick' ? t.stick : t.buttons.find((b) => b.id === this.dragging);
-    if (target) { target.x = fx; target.y = fy; }
+    if (target) {
+      const anchors = this.dragging === 'stick' ? TOUCH_STICK_ANCHORS : TOUCH_BUTTON_ANCHORS;
+      const anchor = touchAnchor(fx, fy, anchors);
+      const x = anchor ? anchor[0] : fx, y = anchor ? anchor[1] : fy;
+      if (target.x !== x || target.y !== y) this.dragMoved = true;
+      target.x = x; target.y = y;
+    }
   }
-  up() { this.dragging = null; }
+  up() {
+    if (this.dragging !== null && this.dragMoved) {
+      const t = this.draft.touch, target = this.dragging === 'stick' ? t.stick : t.buttons.find((b) => b.id === this.dragging);
+      if (target) {
+        const size = t.size || 1, diameter = this.dragging === 'stick' ? STICK : BUTTON;
+        target.x = snapTouchPosition(target.x, size, UI_W, diameter);
+        target.y = snapTouchPosition(target.y, size, UI_H, diameter);
+      }
+    }
+    this.dragging = null; this.dragMoved = false;
+  }
 
   /** A skill, item or function dropped on this tab. Returns true when it landed on a slot. */
   drop(lx, ly, b, c, tab) {

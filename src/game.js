@@ -4101,6 +4101,7 @@ export class Game {
     if (enable) { this.apPending = false; this.scriptPending = 0; this.cashBusy = false; this.pickupAnswered(); }
     const before = this.stats.level, exp0 = this.stats.exp, job0 = this.stats.job;
     Object.assign(this.stats, s);
+    if (s.skin !== undefined || s.face !== undefined || s.hair !== undefined) this.rebuildLook();
     if (s.level > before) this.petEvent('e_levelup');
     else if (s.exp > exp0 && s.exp >= (EXP[this.stats.level] || Infinity) * 0.9 && performance.now() - (this.petPreLevelT ?? -Infinity) >= 420000) { this.petPreLevelT = performance.now(); this.petEvent('e_prelevelup'); }
     this.petAutoPot('mp');
@@ -6395,8 +6396,10 @@ export class Game {
       } else this.endKeydown();
     }
 
-    // the pickup key works on ladders and ropes and mid-attack, not while seated
-    if (this.net && !p.seat && this.pickupKey()) this.tryPickup();
+    // Touch movement picks up drops underfoot while walking; the pickup key still works on ladders and ropes.
+    const touchHeld = inp.sources.get('touch');
+    const touchWalking = !sd && p.fh && !p.ladder && dir !== 0 && (touchHeld?.has('left') || touchHeld?.has('right'));
+    if (this.net && !p.seat && (this.pickupKey() || touchWalking)) this.tryPickup();
     if (p.ladder) {
       const l = p.ladder;
       // a buff cast here plays ladder2 / rope2, and you hang still until it's over
@@ -6930,6 +6933,7 @@ export class Game {
       if (sb.cooling(skillId)) { this.notice('You may not use the skill yet.'); return false; }
       if ((ld?.mpCon || 0) > this.stats.mp) { this.notice('Not enough MP.'); return false; }
       if ((ld?.hpCon || 0) >= this.stats.hp) { this.notice('Not enough HP.'); return false; }
+      if ((ld?.itemConNo || 0) > 0 && this.itemCount(ld.itemCon) < ld.itemConNo) { this.notice('You do not have the required item to use this skill.'); return false; }
       if (skillId === DRAGON_ROAR && this.stats.hp < this.maxHpShown() / 2) { this.notice("You don't have enough HP to use this skill."); return false; }
       if (skillId === FLAME_GEAR && this.flameGearBlocked(lv)) { this.notice('It cannot be used here.'); return false; }
     }
@@ -6993,9 +6997,7 @@ export class Game {
     }
     const looks = skillId === BAND_OF_THIEVES ? this.thiefLooks(skillId, targets.length) : [];
     const max = this.net ? (skillId ? skillMaxDamage(this, skillId, lv, kind) : kind === 'magic' ? 1 : this.maxDamage(pose)) : 25;
-    // Snipe's shot strikes for 199,999 less up to 10,000
-    const roll = () => (skillId === SNIPE ? Math.trunc(199999 - Math.random() * 10000)
-      : ld?.fixdamage ? ld.fixdamage : Math.max(1, Math.round(max * (0.5 + Math.random() * 0.5))));
+    const roll = () => ld?.fixdamage ? ld.fixdamage : Math.max(1, Math.round(max * (0.5 + Math.random() * 0.5)));
     const fixedPhys = !!ld?.fixdamage && (kind === 'ranged' || kind === 'melee');
     // magic and fixed-damage skills never crit; the server tells a critical by its going over the plain maximum
     let crit = this.net && kind !== 'magic' && !ld?.fixdamage ? critical(this, wcat, kind === 'ranged') : null, pct = ld?.damage || 100;
@@ -8461,7 +8463,7 @@ export class Game {
     const ammo = this.ammoItem();
     if (ammo) pad += this.windows?.info(ammo)?.incPAD || 0;
     pad = Math.max(0, Math.min(1999, pad));
-    const clamp = (v) => Math.max(1, Math.min(199999, Math.trunc(v)));
+    const clamp = (v) => Math.max(1, Math.trunc(v));
     return [clamp(((main * m * mult[0] + other) * pad) / 100), clamp(((main * mult[1] + other) * pad) / 100)];
   }
 
@@ -8573,14 +8575,14 @@ export class Game {
     const vs = elem && new RegExp(`${elem.toUpperCase()}(\\d)`).exec(info.elemAttr || '')?.[1];
     if (vs) {
       const p = PART_ELEMENT.has(skillId) ? (ld?.x || 0) / 100 : 1;
-      d = vs === '1' ? d * (1 - p) : vs === '2' ? d * (1 - p * 0.5) : vs === '3' ? Math.min(199999, Math.max(d, d * (1 + p * 0.5))) : d;
+      d = vs === '1' ? d * (1 - p) : vs === '2' ? d * (1 - p * 0.5) : vs === '3' ? Math.max(d, d * (1 + p * 0.5)) : d;
     }
     // a charge: its damage %, then its element at z% of the usual
     const held = this.activeCharge();
     if (held) {
       d = (d * (held.ld.damage || 100)) / 100;
       const cv = new RegExp(`${held.elem}(\\d)`).exec(info.elemAttr || '')?.[1], p = (held.ld.z || 0) / 100;
-      d = cv === '1' ? d * (1 - p) : cv === '2' ? d * (1 - p * 0.5) : cv === '3' ? Math.min(199999, Math.max(d, d * (1 + p * 0.5))) : d;
+      d = cv === '1' ? d * (1 - p) : cv === '2' ? d * (1 - p * 0.5) : cv === '3' ? Math.max(d, d * (1 + p * 0.5)) : d;
     }
     const pdd = IGNORE_DEFENCE.has(skillId) ? 0 : Math.min(1999, Math.max(0, info.PDDamage || 0));
     const base = Math.trunc(d - rand(pdd * 0.5, pdd * 0.6));
@@ -8610,7 +8612,7 @@ export class Game {
     if (!c && m.status?.second & HARD_SKIN) return { d: 0, c: false };   // Hard Skin: only criticals get through
     // Bullseye: x% more on the monster Homing Beacon marked, once it is learned
     if (m === this.beaconMob && this.skills.level(BULLSEYE)) d = (d * ((Number(this.skills.levelData(BULLSEYE)?.x) || 0) + 100)) / 100;
-    return { d: Math.min(199999, Math.max(1, Math.trunc(d))), c };
+    return { d: Math.max(1, Math.trunc(d)), c };
   }
   /** Your accuracy x 100 / (255 + 10 a level the monster has over you), x 0.7-1.3, under its avoid: a miss. */
   accuracyMiss(info, over) {
@@ -8643,7 +8645,7 @@ export class Game {
     if (over) d = ((100 - over) * d) / 100;
     const elem = this.skills.node(SHADOW_MESO)?.elemAttr;
     const vs = elem && new RegExp(`${elem.toUpperCase()}(\\d)`).exec(info.elemAttr || '')?.[1];
-    if (vs) d = vs === '1' ? 0 : vs === '2' ? d * 0.5 : vs === '3' ? Math.min(199999, d * 1.5) : d;
+    if (vs) d = vs === '1' ? 0 : vs === '2' ? d * 0.5 : vs === '3' ? d * 1.5 : d;
     return { d: Math.max(1, Math.trunc(d)), c };
   }
   /** Weapon attack: equipment, attack buffs, Bow Expert / Marksman Boost and a shot's ammo, at most 1999. */
@@ -9819,7 +9821,7 @@ export class Game {
     const guard = this.buffs?.some((b) => b.source === MESO_GUARD && b.until > Date.now()) && this.skills.levelData(MESO_GUARD);
     let lost = damage;
     if (guard?.x) {
-      let absorbed = Math.trunc(Math.min(199999, damage) / 2);
+      let absorbed = Math.trunc(damage / 2);
       if (this.meso < Math.trunc((absorbed * guard.x) / 100)) absorbed = Math.trunc((this.meso * 100) / guard.x);
       if (absorbed > 0) { lost = damage - absorbed; this.playSkillEffect(MESO_GUARD, p, false, 'special'); }
     }

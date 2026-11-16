@@ -7,7 +7,7 @@ import { WzButton, TextField, uiText, wrapText } from './wzui.js';
 import { richText, drawRich, QUEST_STATES } from './richtext.js';
 import { isPartyQuest, questSort, TITLE_AREA } from '../quests.js';
 import { UI_W, UI_H } from '../view.js';
-import { CODE_TO_SC, DEFAULT_QUICKSLOTS, DEFAULT_QUICKSLOTS2, saveQuickKeys2 } from '../keymap.js';
+import { CODE_TO_SC, ACTION, DEFAULT_QUICKSLOTS, DEFAULT_QUICKSLOTS2, saveQuickKeys2 } from '../keymap.js';
 
 /**
  * In-game windows from UI/UIWindow.img, drawn on the game canvas like the v83 client:
@@ -2082,6 +2082,7 @@ class KeyConfigWin extends Win {
   paletteFn(i) {
     const f = FUNCTIONS[i];
     if (!f || !this.W.icon[f[1]]) return null;
+    if (this.tab === 'touch' && f[0] === 5 && f[1] === ACTION.PICKUP) return null;
     const used = this.tab === 'keyboard' ? Object.values(this.draft) : this.tabs.bound(this.tab);
     return used.some((b) => b.type === f[0] && b.action === f[1]) ? null : f;
   }

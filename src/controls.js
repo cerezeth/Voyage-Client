@@ -33,17 +33,15 @@ export function defaultPad() {
   };
 }
 
-/** Touch layout: positions are fractions of the 800x600 view (the button's centre). Hidden until turned on in Key Setting. */
+/** Touch layout: positions are fractions of the 800x600 view (the button's centre). Shown by default on touch devices. */
 export function defaultTouch() {
   return {
-    show: 'off', size: 1, opacity: 0.75,
+    show: 'auto', size: 1, opacity: 0.75,
     stick: { x: 0.12, y: 0.74 },
     buttons: [
       // above the quick slots in the bottom-right corner
       { id: 1, x: 0.92, y: 0.62, b: { type: 5, action: ACTION.JUMP } },
       { id: 2, x: 0.81, y: 0.67, b: { type: 5, action: ACTION.ATTACK } },
-      { id: 3, x: 0.82, y: 0.51, b: { type: 5, action: ACTION.PICKUP } },
-      { id: 4, x: 0.93, y: 0.46, b: { type: 5, action: ACTION.NPC_CHAT } },
     ],
   };
 }
@@ -66,7 +64,11 @@ export function bindingLabel(b) {
 export function loadControls() {
   try {
     const c = JSON.parse(readKept(STORE) || 'null');
-    if (c) return { pad: c.pad || defaultPad(), padMove: c.padMove === 'dpad' ? 'dpad' : 'ls', touch: { ...defaultTouch(), ...c.touch } };
+    if (c) {
+      const touch = { ...defaultTouch(), ...c.touch };
+      touch.buttons = touch.buttons.filter((b) => !(b.b?.type === 5 && b.b.action === ACTION.PICKUP));
+      return { pad: c.pad || defaultPad(), padMove: c.padMove === 'dpad' ? 'dpad' : 'ls', touch };
+    }
   } catch { /* storage blocked or bad data: the defaults */ }
   return { pad: defaultPad(), padMove: 'ls', touch: defaultTouch() };
 }

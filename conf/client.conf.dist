@@ -211,7 +211,7 @@ Login.TypePic = false
 #                     screen.
 #        Default:     false - the bar alone.
 
-Monsters.BossHpPercent = false
+Monsters.BossHpPercent = true
 
 #
 ###################################################################################################
@@ -225,7 +225,7 @@ Monsters.BossHpPercent = false
 #                     under an hour, then hours.
 #        Default:     false - the icon only clears from the top as the cooldown runs out.
 
-Skills.ShowCooldownTime = false
+Skills.ShowCooldownTime = true
 
 #
 ###################################################################################################

@@ -62,7 +62,7 @@ Voyage-Client/  Voyage-Server/  Voyage-Editor/    # each pointed at ../voyage-as
 | 🪟 | **Windows** | Inventory, stats, trade, Maker, Dojo, Pyramid, Transform, Cash Shop, Player Shop (MTS), guild (alliance invitations), party, messenger and world map |
 | 💬 | **Social** | Give and take fame from other players |
 | 🌊 | **Aran** | Energy charge and combo count |
-| 📱 | **Touch & gamepad** | Play on phones and touch screens with drag-arrangeable touch controls, plus gamepad support |
+| 📱 | **Touch & gamepad** | Arrange touch controls on a snap grid, auto-pick up drops while walking, and use gamepad support |
 | 🎛️ | **Settings** | Server and quality-of-life options in `conf/client.conf` (see [Settings](#%EF%B8%8F-settings)) |
 
 ## 🧩 How It Works in a Browser
@@ -157,6 +157,8 @@ On start the server also packs your character, NPC, monster and tile-set files i
 
 Open `http://<host>:3000`, log in, and pick a channel and a character. 🎮
 
+On a supported browser, install Voyage Client from the browser's **Install app** or **Add to Home Screen** option. Installation requires HTTPS, or `localhost` during development. The service worker caches the app shell for launch, but playing still requires a connection to Voyage-Client, Voyage-Server and the game assets; gameplay is not available offline.
+
 ## ⚙️ Settings
 
 `conf/client.conf` (TOML) holds every setting. The server creates it from the tracked `conf/client.conf.dist` on first start; that template documents each key and its default. `client.conf` is gitignored, so your settings stay local.
@@ -214,6 +216,9 @@ Voyage-Client/
 ├── cache/                # sheets the server makes from your assets on start: gitignored
 ├── public/
 │   ├── index.html
+│   ├── manifest.webmanifest
+│   ├── service-worker.js
+│   ├── icons/              # install and home-screen icons
 │   ├── style.css
 │   ├── FrameWorker.js    # worker that puts character frames together off the page's thread (/fps worker)
 │   └── Voyage.js         # built client bundle: gitignored, generated at build/boot
@@ -272,7 +277,7 @@ Yes, with Voyage Client. It renders maps, characters, monsters, and the v83 UI i
 
 <br />
 
-Yes. It includes drag-arrangeable touch controls for phones and touch screens, plus gamepad support.
+Yes. Touch controls appear automatically on touch devices and can be arranged on a snap grid; drops are picked up while walking. Gamepad support is included too.
 
 </details>
 
